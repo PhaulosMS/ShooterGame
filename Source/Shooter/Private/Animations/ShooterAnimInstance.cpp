@@ -31,6 +31,4 @@ void UShooterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	UpdateAnimationProperties();
-
-	
 }

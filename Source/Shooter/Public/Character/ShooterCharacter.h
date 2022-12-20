@@ -43,6 +43,9 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Controls | Input Actions", meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Controls | Input Actions", meta = (AllowPrivateAccess = "true"))
+	UInputAction* AimingAction;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Controls | Input Mapping", meta = (AllowPrivateAccess = "true"))
 	// ReSharper disable once UnrealHeaderToolError
@@ -60,9 +63,18 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
 
-	/********************
-	Gun Related Variables
-	********************/
+	float CameraCurrentFOV;
+	float CameraDefaultFOV;
+	float CameraZoomedFOV;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	float ZoomInterpSpeed;
+	
+	
+
+	/************
+	Gun Variables
+	************/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	USoundBase* FireSound;
 
@@ -78,17 +90,28 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	UAnimMontage* HipFireMontage;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	bool bAiming;
+
 protected:
+	/******************
+	Movement Functions
+	******************/
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 
+	/************
+	Gun Functions
+	************/
 	void Fire();
-
 	bool GetBeamEndLocation(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation);
-
+	void AimingButtonPressed();
+	void AimingButtonReleased();
+	void CameraZoomInterp(float DeltaTime);
 public:
 	FORCEINLINE UCameraComponent* GetCamera() const { return FollowCamera; }
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+	FORCEINLINE bool GetAiming() const { return bAiming; }
 
 	
 

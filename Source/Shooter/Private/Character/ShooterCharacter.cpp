@@ -11,11 +11,20 @@
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystemComponent.h"
 
+
 // Sets default values
 AShooterCharacter::AShooterCharacter()
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+
+	bAiming = false;
+	// Dont rotate when controller rotates, only rotates camera when controller rotates
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationRoll = false;
+	bUseControllerRotationYaw = true;
+
+	
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetRootComponent());
@@ -32,17 +41,17 @@ AShooterCharacter::AShooterCharacter()
 	GetCharacterMovement()->JumpZVelocity = 600.0f;
 	GetCharacterMovement()->AirControl = 0.2f;
 
-	// Dont rotate when controller rotates, only rotates camera when controller rotates
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationRoll = false;
-	bUseControllerRotationYaw = true;
 
-	bAiming = false;
 
 	CameraCurrentFOV = 0.0f;
 	CameraDefaultFOV = 0.0;
 	CameraZoomedFOV = 40.0f;
 	ZoomInterpSpeed = 30.0f;
+	
+	HipTurnRate = 1.0f;
+	HipLookUpRate = 1.0f;
+	AimingTurnRate = 0.2f;
+	AimingLookUpRate = 0.2f;
 }
 
 
@@ -77,7 +86,9 @@ void AShooterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	CameraZoomInterp(DeltaTime);
+	CalculateCrosshairSpread(DeltaTime);
 }
+
 
 // Called to bind functionality to input
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -95,11 +106,7 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	}
 }
 
-void AShooterCharacter::CameraZoomInterp(float DeltaTime)
-{
-	CameraCurrentFOV = FMath::FInterpTo(CameraCurrentFOV, bAiming ? CameraZoomedFOV : CameraDefaultFOV, DeltaTime, ZoomInterpSpeed);
-	GetCamera()->SetFieldOfView(CameraCurrentFOV);
-}
+
 
 void AShooterCharacter::Move(const FInputActionValue& Value)
 {
@@ -119,9 +126,38 @@ void AShooterCharacter::Move(const FInputActionValue& Value)
 
 void AShooterCharacter::Look(const FInputActionValue& Value)
 {
+	float TurnScaleFactor;
+	float LookUpScaleFactor;
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
-	AddControllerPitchInput(LookAxisVector.Y);
-	AddControllerYawInput(LookAxisVector.X);
+	if (bAiming)
+	{
+		TurnScaleFactor = AimingTurnRate;
+		LookUpScaleFactor = AimingLookUpRate;
+	}
+	else
+	{
+		TurnScaleFactor = HipTurnRate;
+		LookUpScaleFactor = HipLookUpRate;
+	}
+	AddControllerPitchInput(LookAxisVector.Y * LookUpScaleFactor);
+	AddControllerYawInput(LookAxisVector.X * TurnScaleFactor);
+}
+
+void AShooterCharacter::CameraZoomInterp(float DeltaTime)
+{
+	CameraCurrentFOV = FMath::FInterpTo(CameraCurrentFOV, bAiming ? CameraZoomedFOV : CameraDefaultFOV, DeltaTime, ZoomInterpSpeed);
+	GetCamera()->SetFieldOfView(CameraCurrentFOV);
+}
+
+void AShooterCharacter::CalculateCrosshairSpread(float DeltaTime)
+{
+	FVector2D WalkSpeedRange = FVector2D(0.0f, 600.0f);
+	FVector2D VelocityMultiplierRange = FVector2D(0.0f, 1.0f);
+	FVector Velocity = GetVelocity();
+	Velocity.Z = 0;
+	CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(WalkSpeedRange, VelocityMultiplierRange, Velocity.Size());
+	
+	CrosshairSpreadMultiplier = 0.5f + CrosshairVelocityFactor;
 }
 
 void AShooterCharacter::Fire()

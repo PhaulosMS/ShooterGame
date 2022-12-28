@@ -6,21 +6,35 @@
 #include "GameFramework/Actor.h"
 #include "BaseItem.generated.h"
 
+class UBoxComponent;
+class UWidgetComponent;
+
 UCLASS()
 class SHOOTER_API ABaseItem : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	ABaseItem();
-
 protected:
-	// Called when the game starts or when spawned
+	/****************
+	Virtual Functions
+	*****************/
 	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
+private:
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	USkeletalMeshComponent* ItemMesh;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	UBoxComponent* CollisionBox;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	UWidgetComponent* PickupWidget;
+	
+public:
+	
 
 };

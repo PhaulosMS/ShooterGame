@@ -93,6 +93,10 @@ private:
 	float CrosshairAimFactor;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Crosshair", meta = (AllowPrivateAccess = "true"))
 	float CrosshairShootingFactor;
+
+	float ShootTimeDuration;
+	bool bFiringBullet;
+	FTimerHandle CrosshairShootTimer;
 	
 
 	/************
@@ -116,6 +120,14 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	bool bAiming;
 
+	bool bFireButtonPressed;
+
+	bool bShouldFire;
+
+	float AutomaticFireRate;
+
+	FTimerHandle AutoFireTimer;
+
 protected:
 	/******************
 	Movement Functions
@@ -131,11 +143,20 @@ protected:
 	void AimingButtonPressed();
 	void AimingButtonReleased();
 	void CameraZoomInterp(float DeltaTime);
+	void FireButtonPressed();
+	void FireButtonReleased();
+	void StartFireTimer();
+	UFUNCTION()
+	void AutoFireReset();
 
 	/******************
 	Crosshair Functions
 	*******************/
 	void CalculateCrosshairSpread(float DeltaTime);
+	UFUNCTION()
+	void StartCrosshairBulletFire();
+	UFUNCTION()
+	void FinishCrosshairBulletFire();
 	
 public:
 	FORCEINLINE UCameraComponent* GetCamera() const { return FollowCamera; }

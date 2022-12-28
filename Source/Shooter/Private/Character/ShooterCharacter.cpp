@@ -23,9 +23,7 @@ AShooterCharacter::AShooterCharacter()
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
 	bUseControllerRotationYaw = true;
-
 	
-
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetRootComponent());
 	CameraBoom->TargetArmLength = 200.0f;
@@ -41,17 +39,28 @@ AShooterCharacter::AShooterCharacter()
 	GetCharacterMovement()->JumpZVelocity = 600.0f;
 	GetCharacterMovement()->AirControl = 0.2f;
 
-
-
 	CameraCurrentFOV = 0.0f;
 	CameraDefaultFOV = 0.0;
 	CameraZoomedFOV = 40.0f;
 	ZoomInterpSpeed = 30.0f;
-	
+
 	HipTurnRate = 1.0f;
 	HipLookUpRate = 1.0f;
 	AimingTurnRate = 0.2f;
 	AimingLookUpRate = 0.2f;
+
+	CrosshairAimFactor = 0.0f;
+	CrosshairSpreadMultiplier = 0.0f;
+	CrosshairVelocityFactor = 0.0f;
+	CrosshairInAirFactor = 0.0f;
+	CrosshairShootingFactor = 0.0f;
+
+	ShootTimeDuration = 0.05f;
+	bFiringBullet = false;
+
+	AutomaticFireRate = 0.1f;
+	bShouldFire = true;
+	bFireButtonPressed = false;
 }
 
 
@@ -64,8 +73,7 @@ void AShooterCharacter::BeginPlay()
 	if (const APlayerController* const PC = Cast<APlayerController>(GetController()))
 	{
 		// Get the Enhanced Input Local Player Subsystem from the Local Player related to our Player Controller.
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<
-			UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
 			// Add each mapping context, along with their priority values. Higher values outprioritize lower values.
 			Subsystem->AddMappingContext(BaseMappingContext, BaseMappingPriority);
@@ -98,7 +106,8 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	{
 		PlayerEnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AShooterCharacter::Move);
 		PlayerEnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AShooterCharacter::Look);
-		PlayerEnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &AShooterCharacter::Fire);
+		PlayerEnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &AShooterCharacter::FireButtonPressed);
+		PlayerEnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &AShooterCharacter::FireButtonReleased);
 		PlayerEnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 		PlayerEnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Canceled, this, &ACharacter::StopJumping);
 		PlayerEnhancedInputComponent->BindAction(AimingAction, ETriggerEvent::Triggered, this, &AShooterCharacter::AimingButtonPressed);
@@ -149,16 +158,36 @@ void AShooterCharacter::CameraZoomInterp(float DeltaTime)
 	GetCamera()->SetFieldOfView(CameraCurrentFOV);
 }
 
+
 void AShooterCharacter::CalculateCrosshairSpread(float DeltaTime)
 {
-	FVector2D WalkSpeedRange = FVector2D(0.0f, 600.0f);
-	FVector2D VelocityMultiplierRange = FVector2D(0.0f, 1.0f);
+	// Crosshair Velocity calculation
+	const FVector2D WalkSpeedRange = FVector2D(0.0f, 600.0f);
+	const FVector2D VelocityMultiplierRange = FVector2D(0.0f, 1.0f);
 	FVector Velocity = GetVelocity();
 	Velocity.Z = 0;
 	CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(WalkSpeedRange, VelocityMultiplierRange, Velocity.Size());
-	
-	CrosshairSpreadMultiplier = 0.5f + CrosshairVelocityFactor;
+	// Crosshair in air calculation
+	CrosshairInAirFactor = GetCharacterMovement()->IsFalling() ? FMath::FInterpTo(CrosshairInAirFactor, 2.25f, DeltaTime, 2.25f) : FMath::FInterpTo(CrosshairInAirFactor, 0.0f, DeltaTime, 30.0f);
+	// Crosshair  bAiming calculation
+	CrosshairAimFactor = bAiming ?  FMath::FInterpTo(CrosshairAimFactor, 0.6f, DeltaTime, 30.0f) : FMath::FInterpTo(CrosshairInAirFactor, 0.0f, DeltaTime, 30.0f);
+	// Crosshair Calucation if firing a bullet
+	CrosshairShootingFactor = bFiringBullet ? FMath::FInterpTo(CrosshairShootingFactor, 0.3, DeltaTime, 60.0f) : FMath::FInterpTo(CrosshairInAirFactor, 0.0f, DeltaTime, 30.0f);
+
+	// Applying the crosshair factors
+	CrosshairSpreadMultiplier = 0.5f + CrosshairVelocityFactor + CrosshairInAirFactor - CrosshairAimFactor + CrosshairShootingFactor;
 }
+
+void AShooterCharacter::StartCrosshairBulletFire()
+ {
+	bFiringBullet = true;
+	GetWorldTimerManager().SetTimer(CrosshairShootTimer, this, &AShooterCharacter::FinishCrosshairBulletFire, ShootTimeDuration);
+ }
+ 
+ void AShooterCharacter::FinishCrosshairBulletFire()
+ {
+	bFiringBullet = false;
+ }
 
 void AShooterCharacter::Fire()
 {
@@ -195,6 +224,8 @@ void AShooterCharacter::Fire()
 		AnimInstance->Montage_Play(HipFireMontage);
 		AnimInstance->Montage_JumpToSection(FName("StartFire"), HipFireMontage);
 	}
+
+	StartCrosshairBulletFire();
 }
 
 bool AShooterCharacter::GetBeamEndLocation(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation)
@@ -209,7 +240,6 @@ bool AShooterCharacter::GetBeamEndLocation(const FVector& MuzzleSocketLocation, 
 
 	// Get screen space location of crosshairs
 	FVector2D CrosshairLocation(ViewportSize.X / 2.0f, ViewportSize.Y / 2.0f);
-	CrosshairLocation.Y -= 50.0f;
 	FVector CrosshairWorldPosition;
 	FVector CrosshairWorldDirection;
 
@@ -247,6 +277,25 @@ bool AShooterCharacter::GetBeamEndLocation(const FVector& MuzzleSocketLocation, 
 	return false;
 }
 
+void AShooterCharacter::StartFireTimer()
+{
+	if (bShouldFire)
+	{
+		Fire();
+		bShouldFire = false;
+		GetWorldTimerManager().SetTimer(AutoFireTimer, this, &AShooterCharacter::AutoFireReset, AutomaticFireRate);
+	}
+}
+
+void AShooterCharacter::AutoFireReset()
+{
+	bShouldFire = true;
+	if (bFireButtonPressed)
+	{
+		StartFireTimer();
+	}
+}
+
 void AShooterCharacter::AimingButtonPressed()
 {
 	bAiming = true;
@@ -256,3 +305,16 @@ void AShooterCharacter::AimingButtonReleased()
 {
 	bAiming = false;
 }
+
+void AShooterCharacter::FireButtonPressed()
+{
+	bFireButtonPressed = true;
+	StartFireTimer();
+}
+
+void AShooterCharacter::FireButtonReleased()
+{
+	bFireButtonPressed = false;
+}
+
+

@@ -12,6 +12,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class ABaseItem;
 
 UCLASS()
 class SHOOTER_API AShooterCharacter : public ACharacter
@@ -97,6 +98,17 @@ private:
 	float ShootTimeDuration;
 	bool bFiringBullet;
 	FTimerHandle CrosshairShootTimer;
+
+	/*********************
+	Item Tracing Variables
+	*********************/
+	bool bShouldTraceForItems;
+	UPROPERTY(VisibleAnywhere)
+	int8 OverlappedItemCount;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Items", meta = (AllowPrivateAccess = "true"))
+	ABaseItem* TraceHitItemLastFrame;
+	
 	
 
 	/************
@@ -139,7 +151,7 @@ protected:
 	Gun Functions
 	************/
 	void Fire();
-	bool GetBeamEndLocation(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation);
+	bool GetBeamEndLocation(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation) const;
 	void AimingButtonPressed();
 	void AimingButtonReleased();
 	void CameraZoomInterp(float DeltaTime);
@@ -157,7 +169,12 @@ protected:
 	void StartCrosshairBulletFire();
 	UFUNCTION()
 	void FinishCrosshairBulletFire();
-	bool TraceUnderCrossHairs(FHitResult& OutHitResult);
+	bool TraceUnderCrossHairs(FHitResult& OutHitResult,  FVector& OutHitLocation) const;
+
+	/*********************
+	Item Tracing Functions
+	*********************/
+	void TraceForItems();
 	
 public:
 	FORCEINLINE UCameraComponent* GetCamera() const { return FollowCamera; }
@@ -165,6 +182,10 @@ public:
 	FORCEINLINE bool GetAiming() const { return bAiming; }
 	UFUNCTION(BlueprintCallable)
 	float GetCrosshairSpreadMultiplier() const { return CrosshairSpreadMultiplier; }
+	FORCEINLINE int8 GetOverlappedItemCount() const { return OverlappedItemCount; }
+
+	// Adds/Subracts to/from OverlappedItemCount and will update bool bShouldTraceForItems
+	void IncrementOverlappedItemCount(int8 Amount);
 
 	
 

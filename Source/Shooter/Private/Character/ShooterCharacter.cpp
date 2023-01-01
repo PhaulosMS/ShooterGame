@@ -5,9 +5,11 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Items/BaseItem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystemComponent.h"
 
@@ -95,6 +97,16 @@ void AShooterCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	CameraZoomInterp(DeltaTime);
 	CalculateCrosshairSpread(DeltaTime);
+	
+	FHitResult ItemTraceResult;
+	TraceUnderCrossHairs(ItemTraceResult);
+	if (ItemTraceResult.bBlockingHit)
+	{
+		if (ABaseItem* HitItem = Cast<ABaseItem>(ItemTraceResult.GetActor()))
+		{
+			HitItem->GetPickupWidget()->SetVisibility(true);
+		}
+	}
 }
 
 
@@ -188,6 +200,31 @@ void AShooterCharacter::StartCrosshairBulletFire()
  {
 	bFiringBullet = false;
  }
+
+bool AShooterCharacter::TraceUnderCrossHairs(FHitResult& OutHitResult)
+{
+	FVector2D ViewportSize;
+	if (GEngine && GEngine->GameViewport)
+	{
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+	}
+
+	FVector2D CrosshairLocation(ViewportSize.X / 2.0f, ViewportSize.Y / 2.0f);
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
+
+	// Get world position and direction of crosshairs
+	if (UGameplayStatics::DeprojectScreenToWorld(UGameplayStatics::GetPlayerController(this, 0), CrosshairLocation,CrosshairWorldPosition, CrosshairWorldDirection))
+	{
+		const FVector Start = CrosshairWorldPosition;
+		const FVector End = Start + CrosshairWorldDirection * 50'000;
+		GetWorld()->LineTraceSingleByChannel(OutHitResult, Start, End, ECC_Visibility);
+		if (OutHitResult.bBlockingHit) return true;
+	}
+	return false;
+
+	
+}
 
 void AShooterCharacter::Fire()
 {

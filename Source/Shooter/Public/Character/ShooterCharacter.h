@@ -157,6 +157,7 @@ protected:
 	void StartCrosshairBulletFire();
 	UFUNCTION()
 	void FinishCrosshairBulletFire();
+	bool TraceUnderCrossHairs(FHitResult& OutHitResult);
 	
 public:
 	FORCEINLINE UCameraComponent* GetCamera() const { return FollowCamera; }
